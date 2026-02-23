@@ -28,9 +28,8 @@ SCORE_FIELDS = [
     ("fearless_dress",  "Fearless Dress"),
     ("red_shirt",       "Red Shirt"),
     ("speaknow_dress",  "Speak Now Dress"),
-    ("rep_bodysuit",    "rep Bodysuit"),
+    ("rep_bodysuit",    "reputation Bodysuit"),
     ("folklore_dress",  "folklore Dress"),
-    ("1989_combo",      "1989 Combo"),
     ("1989_top",        "1989 Top"),
     ("1989_skirt",      "1989 Skirt"),
     ("ttpd_dress",      "TTPD Dress"),
@@ -49,40 +48,26 @@ SCORE_FIELDS = [
 ]
 
 OUTFIT_OPTIONS = {
-    "lover_bodysuit": ["Pink & Blue bodysuit", "Gold & Blue bodysuit", "Purple bodysuit", "Pink bodysuit", "Tangerine (orange) bodysuit"],
-    "lover_jacket":   ["Silver The Man jacket", "Black The Man jacket", "Purple The Man jacket", "Pink The Man jacket", "Tangerine The Man jacket"],
-    "lover_guitar":   ["Pink guitar", "Blue guitar", "Lavender guitar"],
-    "fearless_dress": ["Short gold", "Long gold", "Long silver", "Black & Silver"],
-    "red_shirt":      ["A lot going on", "Ew", "Like ever", "Taylor's version", "About me", "Trouble"],
-    "speaknow_dress": ["Champagne dress", "Pink dress", "Tissue paper dress", "Silver dress", "Purple dress", "Blue dress", "Swirls dress"],
+    "lover_bodysuit": ["Pink & Blue Bodysuit", "Gold & Blue Bodysuit", "Purple Bodysuit", "Pink Bodysuit", "Tangerine Bodysuit"],
+    "lover_jacket":   ["Silver The Man Jacket", "Black The Man Jacket", "Purple The Man Jacket", "Pink The Man Jacket", "Tangerine The Man Jacket"],
+    "lover_guitar":   ["Pink Guitar", "Blue Guitar", "Lavender Guitar"],
+    "fearless_dress": ["Short Gold", "Long Gold", "Long Silver", "Black & Silver"],
+    "red_shirt":      ["A Lot Going Ob", "Ew", "Like Ever", "Taylor's Version", "About Me", "Trouble"],
+    "speaknow_dress": ["Champagne Dress", "Pink Dress", "Tissue Paper Dress", "Silver Dress", "Purple Dress", "Blue Dress", "Swirls Dress"],
     "rep_bodysuit":   ["Black & Red"],
-    "folklore_dress": ["Purple dress", "Cream dress", "Pink dress", "Green dress", "Blue dress", "Yellow dress", "Berry dress"],
-    "1989_combo": [
-        "Pink, Blue - Mermaid", "Orange, Purple - Tutti Frutti", "Green, Pink - Watermelon",
-        "Yellow, Orange - Chiefs", "Yellow, Blue - Swedish Fish", "Pink, Orange - Starburst",
-        "Blue, Yellow - Flounder", "Purple, Blue - Sully", "Pink, Yellow - Pink Lemonade",
-        "Orange, Yellow - Fuego", "Pink, Purple - Cheshire Cat", "Fully Orange - Karma",
-        "Green, Blue - Debut", "Yellow, Pink - Princess Peach", "Blue, Purple - Bibble",
-        "Purple, Green - Ariel", "Blue, Pink - Loverpool", "Purple, Orange - Tide Pod",
-        "Yellow, Green - Lemon Lime", "Orange, Blue - Fundon", "Purple, Pink - Purple Pink Skies",
-        "Pink, Green - Cosmo & Wanda", "Orange, Pink - 2016 Grammys", "Green, Purple - Tayhulk",
-        "Blue, Orange - Firecracker",
-    ],
-    "1989_combo_b": [
-        "Green, Orange - Taycarrot", "Yellow, Purple - Rapunzel", "Orange, Green - The Lucky One",
-    ],
-    "1989_top":        ["Orange top", "Green top", "Blue top", "Yellow top", "Pink top", "Purple top"],
-    "1989_skirt":      ["Orange skirt", "Green skirt", "Blue skirt", "Yellow skirt", "Pink skirt", "Purple skirt"],
-    "ttpd_dress":      ["White dress"],
+    "folklore_dress": ["Purple Dress", "Cream Dress", "Pink Dress", "Green Dress", "Blue Dress", "Yellow Dress", "Berry Dress"],
+    "1989_top":        ["Orange Top", "Green Top", "Blue Top", "Yellow Top", "Pink Top", "Purple Top"],
+    "1989_skirt":      ["Orange Skirt", "Green Skirt", "Blue Skirt", "Yellow Skirt", "Pink Skirt", "Purple Skirt"],
+    "ttpd_dress":      ["White Dress"],
     "ttpd_set":        ["Black", "White", "Graphite"],
     "ttpd_jacket":     ["Gold", "White", "Graphite", "Silver"],
-    "surprise_dress":  ["Bright pink", "Ocean blue", "Sunset (orange)"],
-    "midnights_shirt": ["Dark purple", "Bright blue", "Silver", "Pink", "Light purple", "Iridescent"],
-    "midnights_body":  ["Dark blue", "Scallops", "Cutouts", "Chevron"],
-    "karma_jacket":    ["Multicolor", "Magenta", "Blue", "Pink", "No jacket"],
-    "special_guest":   ["Sabrina Carpenter", "Gracie Abrams", "Muna", "Phoebe Bridgers", "Marcus Mumford", "Haim", "Ed Sheeran", "Ice Spice", "Paramore", "No Special Guest"],
-    "announcement":    ["New Album Announcement", "Tour Extension", "New Music Video", "TV Appearance / Special", "Award / Milestone", "No Announcement"],
-    "setlist_change":  ["Song Added", "Song Removed", "Song Swapped", "No Changes"],
+    "surprise_dress":  ["Bright Pink", "Ocean Blue", "Sunset (orange)"],
+    "midnights_shirt": ["Dark Purple", "Bright Blue", "Silver", "Pink", "Light Purple", "Iridescent"],
+    "midnights_body":  ["Dark Blue", "Scallops", "Cutouts", "Chevron"],
+    "karma_jacket":    ["Multicolor", "Magenta", "Blue", "Pink", "No Jacket"],
+    "special_guest":   ["Yes", "No"],
+    "announcement":    ["Yes", "No"],
+    "setlist_change":  ["Yes", "No"],
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -120,7 +105,7 @@ def build_summary_embed(entry, show):
     e.add_field(name="rep / folklore",
                 value=f"rep Bodysuit: {entry.get('rep_bodysuit','—')}\nfolklore Dress: {entry.get('folklore_dress','—')}", inline=False)
     e.add_field(name="1989",
-                value=f"Combo: {entry.get('1989_combo','—')}\nTop: {entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
+                value=f"Combo: entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
     e.add_field(name="TTPD",
                 value=f"Dress: {entry.get('ttpd_dress','—')}\nSet: {entry.get('ttpd_set','—')}\nJacket/Cape: {entry.get('ttpd_jacket','—')}", inline=False)
     e.add_field(name="Midnights",
