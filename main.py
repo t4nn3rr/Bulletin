@@ -7,7 +7,7 @@ import os
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 WEBHOOK_URL = "https://discord.com/api/webhooks/1475369638001901761/juynubLrFgKHt9cG5E4tGCfj5DZdO5JDPdhu8pREGVEBEVxFCRZxYvwqisLTiyqfWxoa"
-BOT_TOKEN   = os.getenv("DISCORD_BOT_TOKEN", "MTQ3NTM3MDg2NDcyMjU3NTQwMQ.GL5jIh.dn1BGQXcd2VEs1hw3FkLjvSVG37FtLzL2AUit0")
+BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 # ──────────────────────────────────────────────────────────────────────────────
 
 
