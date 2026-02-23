@@ -744,7 +744,7 @@ async def mastermind_list(interaction: discord.Interaction):
              for g in active_games.values()]
     await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
-answer_group = app_commands.Group(name="answer", description="Set answers and score results", parent=mastermind_group)
+answer_group = app_commands.Group(name="answer", description="Set answers and score results")
 
 @answer_group.command(name="create", description="[Admin] Set the real answers for a show and publish results")
 async def answer_create(interaction: discord.Interaction):
