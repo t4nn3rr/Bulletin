@@ -7,20 +7,19 @@ import os
 from datetime import datetime, timezone
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-WEBHOOK_URL = "https://discord.com/api/webhooks/1475369638001901761/juynubLrFgKHt9cG5E4tGCfj5DZdO5JDPdhu8pREGVEBEVxFCRZxYvwqisLTiyqfWxoa"
-BOT_TOKEN   = os.getenv("DISCORD_BOT_TOKEN")
+WEBHOOK_URL  = "https://discord.com/api/webhooks/1475369638001901761/juynubLrFgKHt9cG5E4tGCfj5DZdO5JDPdhu8pREGVEBEVxFCRZxYvwqisLTiyqfWxoa"
+BOT_TOKEN    = os.getenv("DISCORD_BOT_TOKEN")
+ADMIN_ROLE   = 1475027064817188906
 # ──────────────────────────────────────────────────────────────────────────────
 
 active_games: dict = {}
 
 COLORS = {
-    "Blue":   0x3498db, "Green":  0x2ecc71, "Red":    0xe74c3c,
+    "Blue": 0x3498db, "Green": 0x2ecc71, "Red": 0xe74c3c,
     "Yellow": 0xf1c40f, "Purple": 0x9b59b6, "Orange": 0xe67e22,
-    "White":  0xffffff, "Black":  0x2c2f33, "Pink":   0xff6b9d,
-    "Cyan":   0x00d2d3,
+    "White": 0xffffff, "Black": 0x2c2f33, "Pink": 0xff6b9d, "Cyan": 0x00d2d3,
 }
 
-# All scorable fields and their display labels
 SCORE_FIELDS = [
     ("lover_bodysuit",  "Lover Bodysuit"),
     ("lover_jacket",    "Lover Jacket"),
@@ -28,7 +27,7 @@ SCORE_FIELDS = [
     ("fearless_dress",  "Fearless Dress"),
     ("red_shirt",       "Red Shirt"),
     ("speaknow_dress",  "Speak Now Dress"),
-    ("rep_bodysuit",    "reputation Bodysuit"),
+    ("rep_bodysuit",    "rep Bodysuit"),
     ("folklore_dress",  "folklore Dress"),
     ("1989_top",        "1989 Top"),
     ("1989_skirt",      "1989 Skirt"),
@@ -48,27 +47,38 @@ SCORE_FIELDS = [
 ]
 
 OUTFIT_OPTIONS = {
-    "lover_bodysuit": ["Pink & Blue Bodysuit", "Gold & Blue Bodysuit", "Purple Bodysuit", "Pink Bodysuit", "Tangerine Bodysuit"],
-    "lover_jacket":   ["Silver The Man Jacket", "Black The Man Jacket", "Purple The Man Jacket", "Pink The Man Jacket", "Tangerine The Man Jacket"],
-    "lover_guitar":   ["Pink Guitar", "Blue Guitar", "Lavender Guitar"],
-    "fearless_dress": ["Short Gold", "Long Gold", "Long Silver", "Black & Silver"],
-    "red_shirt":      ["A Lot Going Ob", "Ew", "Like Ever", "Taylor's Version", "About Me", "Trouble"],
-    "speaknow_dress": ["Champagne Dress", "Pink Dress", "Tissue Paper Dress", "Silver Dress", "Purple Dress", "Blue Dress", "Swirls Dress"],
-    "rep_bodysuit":   ["Black & Red"],
-    "folklore_dress": ["Purple Dress", "Cream Dress", "Pink Dress", "Green Dress", "Blue Dress", "Yellow Dress", "Berry Dress"],
+    "lover_bodysuit":  ["Pink & Blue Bodysuit", "Gold & Blue Bodysuit", "Purple Bodysuit", "Pink Bodysuit", "Tangerine (Orange) Bodysuit"],
+    "lover_jacket":    ["Silver The Man Jacket", "Black The Man Jacket", "Purple The Man Jacket", "Pink The Man Jacket", "Tangerine The Man Jacket"],
+    "lover_guitar":    ["Pink Guitar", "Blue Guitar", "Lavender Guitar"],
+    "fearless_dress":  ["Short Gold", "Long Gold", "Long Silver", "Black & Silver"],
+    "red_shirt":       ["A Lot Going On", "Ew", "Like Ever", "Taylor's Version", "About Me", "Trouble"],
+    "speaknow_dress":  ["Champagne Dress", "Pink Dress", "Tissue Paper Dress", "Silver Dress", "Purple Dress", "Blue Dress", "Swirls Dress"],
+    "rep_bodysuit":    ["Black & Red"],
+    "folklore_dress":  ["Purple Dress", "Cream Dress", "Pink Dress", "Green Dress", "Blue Dress", "Yellow Dress", "Berry Dress"],
     "1989_top":        ["Orange Top", "Green Top", "Blue Top", "Yellow Top", "Pink Top", "Purple Top"],
     "1989_skirt":      ["Orange Skirt", "Green Skirt", "Blue Skirt", "Yellow Skirt", "Pink Skirt", "Purple Skirt"],
     "ttpd_dress":      ["White Dress"],
     "ttpd_set":        ["Black", "White", "Graphite"],
     "ttpd_jacket":     ["Gold", "White", "Graphite", "Silver"],
-    "surprise_dress":  ["Bright Pink", "Ocean Blue", "Sunset (orange)"],
+    "surprise_dress":  ["Bright Pink", "Ocean Blue", "Sunset (Orange)"],
     "midnights_shirt": ["Dark Purple", "Bright Blue", "Silver", "Pink", "Light Purple", "Iridescent"],
     "midnights_body":  ["Dark Blue", "Scallops", "Cutouts", "Chevron"],
     "karma_jacket":    ["Multicolor", "Magenta", "Blue", "Pink", "No Jacket"],
-    "special_guest":   ["Yes", "No"],
-    "announcement":    ["Yes", "No"],
-    "setlist_change":  ["Yes", "No"],
+    "special_guest":   ["Sabrina Carpenter", "Gracie Abrams", "Muna", "Phoebe Bridgers", "Marcus Mumford", "Haim", "Ed Sheeran", "Ice Spice", "Paramore", "No Special Guest"],
+    "setlist_change":  ["Song Added", "Song Removed", "Song Swapped", "No Changes"],
 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ADMIN ROLE CHECK
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def is_admin(interaction: discord.Interaction) -> bool:
+    if not interaction.guild:
+        return False
+    return any(r.id == ADMIN_ROLE for r in interaction.user.roles)
+
+async def deny(interaction: discord.Interaction):
+    await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  HELPERS
@@ -79,7 +89,6 @@ def ensure_entry(game_id, uid, user_str):
         active_games[game_id]["entries"][uid] = {"user": user_str}
 
 def score_entry(entry, answers):
-    """Return (points, total_possible, per_field dict)."""
     results = {}
     points = 0
     possible = 0
@@ -98,22 +107,14 @@ def score_entry(entry, answers):
 def build_summary_embed(entry, show):
     e = discord.Embed(title=f"Bets Locked — {show}", color=0x5865f2,
                       description=f"Submitted by {entry.get('user', 'Unknown')}")
-    e.add_field(name="Lover",
-                value=f"Bodysuit: {entry.get('lover_bodysuit','—')}\nJacket: {entry.get('lover_jacket','—')}\nGuitar: {entry.get('lover_guitar','—')}", inline=False)
-    e.add_field(name="Fearless / Red / Speak Now",
-                value=f"Fearless: {entry.get('fearless_dress','—')}\nRed Shirt: {entry.get('red_shirt','—')}\nSpeak Now: {entry.get('speaknow_dress','—')}", inline=False)
-    e.add_field(name="rep / folklore",
-                value=f"rep Bodysuit: {entry.get('rep_bodysuit','—')}\nfolklore Dress: {entry.get('folklore_dress','—')}", inline=False)
-    e.add_field(name="1989",
-                value=f"Combo: {entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
-    e.add_field(name="TTPD",
-                value=f"Dress: {entry.get('ttpd_dress','—')}\nSet: {entry.get('ttpd_set','—')}\nJacket/Cape: {entry.get('ttpd_jacket','—')}", inline=False)
-    e.add_field(name="Midnights",
-                value=f"Shirt Dress: {entry.get('midnights_shirt','—')}\nBodysuit: {entry.get('midnights_body','—')}\nKarma Jacket: {entry.get('karma_jacket','—')}", inline=False)
-    e.add_field(name="Surprise Songs",
-                value=f"Dress: {entry.get('surprise_dress','—')}\nGuitar: {entry.get('guitar_album','—')} — {entry.get('guitar_song','—')}\nPiano: {entry.get('piano_album','—')} — {entry.get('piano_song','—')}", inline=False)
-    e.add_field(name="Other",
-                value=f"Guest: {entry.get('special_guest','—')}\nSetlist: {entry.get('setlist_change','—')}\nNotes: {entry.get('notes','—')}", inline=False)
+    e.add_field(name="Lover", value=f"Bodysuit: {entry.get('lover_bodysuit','—')}\nJacket: {entry.get('lover_jacket','—')}\nGuitar: {entry.get('lover_guitar','—')}", inline=False)
+    e.add_field(name="Fearless / Red / Speak Now", value=f"Fearless: {entry.get('fearless_dress','—')}\nRed Shirt: {entry.get('red_shirt','—')}\nSpeak Now: {entry.get('speaknow_dress','—')}", inline=False)
+    e.add_field(name="rep / folklore", value=f"rep Bodysuit: {entry.get('rep_bodysuit','—')}\nfolklore Dress: {entry.get('folklore_dress','—')}", inline=False)
+    e.add_field(name="1989", value=f"Top: {entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
+    e.add_field(name="TTPD", value=f"Dress: {entry.get('ttpd_dress','—')}\nSet: {entry.get('ttpd_set','—')}\nJacket/Cape: {entry.get('ttpd_jacket','—')}", inline=False)
+    e.add_field(name="Midnights", value=f"Shirt Dress: {entry.get('midnights_shirt','—')}\nBodysuit: {entry.get('midnights_body','—')}\nKarma Jacket: {entry.get('karma_jacket','—')}", inline=False)
+    e.add_field(name="Surprise Songs", value=f"Dress: {entry.get('surprise_dress','—')}\nGuitar: {entry.get('guitar_album','—')} — {entry.get('guitar_song','—')}\nPiano: {entry.get('piano_album','—')} — {entry.get('piano_song','—')}", inline=False)
+    e.add_field(name="Other", value=f"Guest: {entry.get('special_guest','—')}\nSetlist: {entry.get('setlist_change','—')}\nNotes: {entry.get('notes','—')}", inline=False)
     e.set_footer(text=f"Submitted {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     return e
 
@@ -125,39 +126,33 @@ def build_score_embed(entry, answers, show):
         description=f"**{points} / {possible} correct ({pct}%)**",
         color=0x2ecc71 if pct >= 70 else (0xf1c40f if pct >= 40 else 0xe74c3c)
     )
-    correct_lines = []
-    wrong_lines   = []
-    skipped_lines = []
+    correct_lines, wrong_lines = [], []
     for key, label in SCORE_FIELDS:
         if key not in results:
-            skipped_lines.append(f"{label}: {entry.get(key, '—')}")
-        elif results[key]["correct"]:
+            continue
+        if results[key]["correct"]:
             correct_lines.append(f"{label}: {results[key]['guess']}")
         else:
             wrong_lines.append(f"{label}: guessed **{results[key]['guess']}**, answer **{results[key]['answer']}**")
     if correct_lines:
-        e.add_field(name=f"Correct ({len(correct_lines)})", value="\n".join(correct_lines) or "None", inline=False)
+        e.add_field(name=f"Correct ({len(correct_lines)})", value="\n".join(correct_lines), inline=False)
     if wrong_lines:
-        e.add_field(name=f"Wrong ({len(wrong_lines)})", value="\n".join(wrong_lines) or "None", inline=False)
-    if skipped_lines:
-        e.add_field(name="Not answered / not scored", value="\n".join(skipped_lines[:10]) or "None", inline=False)
+        e.add_field(name=f"Wrong ({len(wrong_lines)})", value="\n".join(wrong_lines), inline=False)
     return e, points, possible
 
 def build_leaderboard_embed(game):
     answers = game.get("answers", {})
-    show = game["show"]
     scores = []
     for uid, entry in game["entries"].items():
         pts, possible, _ = score_entry(entry, answers)
         scores.append((entry.get("user", str(uid)), pts, possible))
     scores.sort(key=lambda x: x[1], reverse=True)
-
-    e = discord.Embed(title=f"Leaderboard — {show}", color=0x5865f2)
+    e = discord.Embed(title=f"Leaderboard — {game['show']}", color=0x5865f2)
     if not scores:
         e.description = "No entries yet."
         return e
-    lines = []
     medals = ["1st", "2nd", "3rd"]
+    lines = []
     for i, (user, pts, possible) in enumerate(scores):
         rank = medals[i] if i < 3 else f"{i+1}th"
         pct = round((pts / possible) * 100) if possible else 0
@@ -186,7 +181,7 @@ class BetSelect(Select):
         await interaction.response.defer()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  STEP VIEWS  (max 4 selects + 1 button row per view)
+#  PLAYER STEP VIEWS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class Step1LoverView(View):
@@ -202,9 +197,8 @@ class Step1LoverView(View):
         if interaction.user.id != self.uid: return
         entry = active_games[self.game_id]["entries"].get(self.uid, {})
         embed = discord.Embed(title="Fearless / Red / Speak Now", color=0xf1c40f,
-                              description="Step 2 of 8 — pick your predictions. All optional.")
-        embed.add_field(name="Step 1 saved",
-                        value=f"Bodysuit: {entry.get('lover_bodysuit','—')}\nJacket: {entry.get('lover_jacket','—')}\nGuitar: {entry.get('lover_guitar','—')}", inline=False)
+                              description="Step 2 of 7 — All optional.")
+        embed.add_field(name="Step 1 saved", value=f"Bodysuit: {entry.get('lover_bodysuit','—')}\nJacket: {entry.get('lover_jacket','—')}\nGuitar: {entry.get('lover_guitar','—')}", inline=False)
         await interaction.response.edit_message(embed=embed, view=Step2FearlessView(self.game_id, self.uid))
 
 
@@ -219,8 +213,7 @@ class Step2FearlessView(View):
     @discord.ui.button(label="Next: reputation / folklore", style=discord.ButtonStyle.primary, row=4)
     async def next_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
-        embed = discord.Embed(title="reputation / folklore", color=0x2c2f33,
-                              description="Step 3 of 8 — pick your predictions. All optional.")
+        embed = discord.Embed(title="reputation / folklore", color=0x2c2f33, description="Step 3 of 7 — All optional.")
         await interaction.response.edit_message(embed=embed, view=Step3RepView(self.game_id, self.uid))
 
 
@@ -231,32 +224,14 @@ class Step3RepView(View):
         self.add_item(BetSelect("rep Bodysuit", "rep_bodysuit", game_id, uid, OUTFIT_OPTIONS["rep_bodysuit"]))
         self.add_item(BetSelect("folklore Dress", "folklore_dress", game_id, uid, OUTFIT_OPTIONS["folklore_dress"]))
 
-    @discord.ui.button(label="Next: 1989 Combo", style=discord.ButtonStyle.primary, row=4)
+    @discord.ui.button(label="Next: 1989", style=discord.ButtonStyle.primary, row=4)
     async def next_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
-        embed = discord.Embed(title="1989 — Combo", color=0x3498db,
-                              description="Step 4 of 8 — pick the top+skirt combo name, or skip and pick individual top/skirt on the next screen.")
-        await interaction.response.edit_message(embed=embed, view=Step4_1989ComboView(self.game_id, self.uid))
+        embed = discord.Embed(title="1989", color=0x3498db, description="Step 4 of 7 — All optional.")
+        await interaction.response.edit_message(embed=embed, view=Step4_1989View(self.game_id, self.uid))
 
 
-class Step4_1989ComboView(View):
-    def __init__(self, game_id, uid):
-        super().__init__(timeout=300)
-        self.game_id = game_id; self.uid = uid
-        self.add_item(BetSelect("1989 Combo (A-Z, part 1)", "1989_combo", game_id, uid, OUTFIT_OPTIONS["1989_combo"]))
-        self.add_item(BetSelect("1989 Combo (part 2)", "1989_combo", game_id, uid, OUTFIT_OPTIONS["1989_combo_b"]))
-
-    @discord.ui.button(label="Next: 1989 Individual Top & Skirt", style=discord.ButtonStyle.primary, row=4)
-    async def next_btn(self, interaction: discord.Interaction, button: Button):
-        if interaction.user.id != self.uid: return
-        entry = active_games[self.game_id]["entries"].get(self.uid, {})
-        embed = discord.Embed(title="1989 — Individual Top & Skirt", color=0x3498db,
-                              description="Step 5 of 8 — pick individual top & skirt if you did not pick a combo.")
-        embed.add_field(name="Combo saved", value=entry.get("1989_combo", "—"), inline=False)
-        await interaction.response.edit_message(embed=embed, view=Step5_1989IndivView(self.game_id, self.uid))
-
-
-class Step5_1989IndivView(View):
+class Step4_1989View(View):
     def __init__(self, game_id, uid):
         super().__init__(timeout=300)
         self.game_id = game_id; self.uid = uid
@@ -266,12 +241,11 @@ class Step5_1989IndivView(View):
     @discord.ui.button(label="Next: TTPD", style=discord.ButtonStyle.primary, row=4)
     async def next_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
-        embed = discord.Embed(title="The Tortured Poets Department", color=0x708090,
-                              description="Step 6 of 8 — pick your TTPD predictions. All optional.")
-        await interaction.response.edit_message(embed=embed, view=Step6TTPDView(self.game_id, self.uid))
+        embed = discord.Embed(title="The Tortured Poets Department", color=0x708090, description="Step 5 of 7 — All optional.")
+        await interaction.response.edit_message(embed=embed, view=Step5TTPDView(self.game_id, self.uid))
 
 
-class Step6TTPDView(View):
+class Step5TTPDView(View):
     def __init__(self, game_id, uid):
         super().__init__(timeout=300)
         self.game_id = game_id; self.uid = uid
@@ -282,12 +256,11 @@ class Step6TTPDView(View):
     @discord.ui.button(label="Next: Midnights", style=discord.ButtonStyle.primary, row=4)
     async def next_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
-        embed = discord.Embed(title="Midnights", color=0x9b59b6,
-                              description="Step 7 of 8 — pick your Midnights predictions. All optional.")
-        await interaction.response.edit_message(embed=embed, view=Step7MidnightsView(self.game_id, self.uid))
+        embed = discord.Embed(title="Midnights", color=0x9b59b6, description="Step 6 of 7 — All optional.")
+        await interaction.response.edit_message(embed=embed, view=Step6MidnightsView(self.game_id, self.uid))
 
 
-class Step7MidnightsView(View):
+class Step6MidnightsView(View):
     def __init__(self, game_id, uid):
         super().__init__(timeout=300)
         self.game_id = game_id; self.uid = uid
@@ -299,13 +272,13 @@ class Step7MidnightsView(View):
     async def next_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
         embed = discord.Embed(title="Surprise Songs & Final Picks", color=0xe67e22,
-                              description="Step 8 of 8 — pick the surprise song dress and other predictions, then enter guitar & piano songs, then submit.")
-        await interaction.response.edit_message(embed=embed, view=Step8FinalView(self.game_id, self.uid))
+                              description="Step 7 of 7 — Pick the surprise song dress and other predictions, then enter guitar & piano songs, then submit.")
+        await interaction.response.edit_message(embed=embed, view=Step7FinalView(self.game_id, self.uid))
 
 
 class SurpriseSongsModal(Modal, title="Surprise Song Predictions"):
     guitar_album = TextInput(label="Guitar: Album", placeholder="e.g. folklore", required=False, max_length=50)
-    guitar_song  = TextInput(label="Guitar: Song Title", placeholder="e.g. seven", required=False, max_length=100)
+    guitar_song  = TextInput(label="Guitar: Song Title", placeholder="e.g. Seven", required=False, max_length=100)
     piano_album  = TextInput(label="Piano: Album", placeholder="e.g. Red (TV)", required=False, max_length=50)
     piano_song   = TextInput(label="Piano: Song Title", placeholder="e.g. All Too Well (10 Min)", required=False, max_length=100)
 
@@ -322,19 +295,8 @@ class SurpriseSongsModal(Modal, title="Surprise Song Predictions"):
         })
         await interaction.response.send_message("Songs saved! Hit Submit when ready.", ephemeral=True)
 
-class NotesModal(Modal, title="Extra Notes"):
-    notes = TextInput(label="Notes", placeholder="Any other predictions or comments...",
-                      style=discord.TextStyle.paragraph, required=False, max_length=500)
 
-    def __init__(self, game_id, uid):
-        super().__init__()
-        self.game_id = game_id; self.uid = uid
-
-    async def on_submit(self, interaction: discord.Interaction):
-        active_games[self.game_id]["entries"][self.uid]["notes"] = self.notes.value or "—"
-        await interaction.response.send_message("Notes saved!", ephemeral=True)
-
-class Step8FinalView(View):
+class Step7FinalView(View):
     def __init__(self, game_id, uid):
         super().__init__(timeout=300)
         self.game_id = game_id; self.uid = uid
@@ -351,8 +313,7 @@ class Step8FinalView(View):
     async def submit_btn(self, interaction: discord.Interaction, button: Button):
         if interaction.user.id != self.uid: return
         entry = active_games[self.game_id]["entries"].get(self.uid, {})
-        show  = active_games[self.game_id]["show"]
-        embed = build_summary_embed(entry, show)
+        embed = build_summary_embed(entry, active_games[self.game_id]["show"])
         await interaction.response.edit_message(content="Your bets are locked in.", embed=embed, view=None)
 
 
@@ -377,7 +338,7 @@ class MastermindGameView(View):
         uid = interaction.user.id
         ensure_entry(self.game_id, uid, str(interaction.user))
         embed = discord.Embed(title=f"Lover Era — {game['show']}",
-                              description="Step 1 of 8 — pick your Lover era outfit predictions. All fields optional.",
+                              description="Step 1 of 7 — pick your Lover era outfit predictions. All fields optional.",
                               color=0xff6b9d)
         await interaction.response.send_message(embed=embed, view=Step1LoverView(self.game_id, uid), ephemeral=True)
 
@@ -390,140 +351,160 @@ class MastermindGameView(View):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ANSWER MODALS  (admin sets the real answers — 5 fields per modal max)
+#  ADMIN ANSWER VIEWS — dropdown-based, one era per screen
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class AnswerModal1(Modal, title="Set Answers — Lover / Fearless / Red"):
-    lover_bodysuit = TextInput(label="Lover Bodysuit", required=False, max_length=100)
-    lover_jacket   = TextInput(label="The Man Jacket", required=False, max_length=100)
-    lover_guitar   = TextInput(label="Lover Guitar", required=False, max_length=100)
-    fearless_dress = TextInput(label="Fearless Dress / Bodysuit", required=False, max_length=100)
-    red_shirt      = TextInput(label="Red Shirt", required=False, max_length=100)
-
-    def __init__(self, game_id):
-        super().__init__()
+class AnswerSelect(Select):
+    """A dropdown that saves the selected answer into the game's answers dict."""
+    def __init__(self, placeholder, key, game_id, options, extra_option=True):
+        self.key = key
         self.game_id = game_id
+        opts = list(options)
+        if extra_option and "N/A (Not Worn)" not in opts:
+            opts = opts + ["N/A (Not Worn)"]
+        super().__init__(placeholder=placeholder,
+                         options=[discord.SelectOption(label=o, value=o) for o in opts],
+                         min_values=0, max_values=1)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        a = active_games[self.game_id].setdefault("answers", {})
-        if self.lover_bodysuit.value: a["lover_bodysuit"] = self.lover_bodysuit.value
-        if self.lover_jacket.value:   a["lover_jacket"]   = self.lover_jacket.value
-        if self.lover_guitar.value:   a["lover_guitar"]   = self.lover_guitar.value
-        if self.fearless_dress.value: a["fearless_dress"] = self.fearless_dress.value
-        if self.red_shirt.value:      a["red_shirt"]      = self.red_shirt.value
-        await interaction.response.send_message("Part 1 saved. Click below to continue.", view=AnswerNextView(self.game_id, 2), ephemeral=True)
+    async def callback(self, interaction: discord.Interaction):
+        if self.values:
+            active_games[self.game_id]["answers"][self.key] = self.values[0]
+        await interaction.response.defer()
 
-class AnswerModal2(Modal, title="Set Answers — Speak Now / rep / folklore"):
-    speaknow_dress = TextInput(label="Speak Now Dress", required=False, max_length=100)
-    rep_bodysuit   = TextInput(label="rep Bodysuit", required=False, max_length=100)
-    folklore_dress = TextInput(label="folklore Dress", required=False, max_length=100)
-    combo_1989     = TextInput(label="1989 Combo Name", required=False, max_length=100)
-    top_1989       = TextInput(label="1989 Top", required=False, max_length=100)
 
+class AnswerStep1LoverView(View):
     def __init__(self, game_id):
-        super().__init__()
-        self.game_id = game_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        a = active_games[self.game_id].setdefault("answers", {})
-        if self.speaknow_dress.value: a["speaknow_dress"] = self.speaknow_dress.value
-        if self.rep_bodysuit.value:   a["rep_bodysuit"]   = self.rep_bodysuit.value
-        if self.folklore_dress.value: a["folklore_dress"] = self.folklore_dress.value
-        if self.combo_1989.value:     a["1989_combo"]     = self.combo_1989.value
-        if self.top_1989.value:       a["1989_top"]       = self.top_1989.value
-        await interaction.response.send_message("Part 2 saved. Click below to continue.", view=AnswerNextView(self.game_id, 3), ephemeral=True)
-
-class AnswerModal3(Modal, title="Set Answers — 1989 / TTPD"):
-    skirt_1989    = TextInput(label="1989 Skirt", required=False, max_length=100)
-    ttpd_dress    = TextInput(label="TTPD Dress", required=False, max_length=100)
-    ttpd_set      = TextInput(label="TTPD Set", required=False, max_length=100)
-    ttpd_jacket   = TextInput(label="TTPD Jacket / Cape", required=False, max_length=100)
-    midnights_shirt = TextInput(label="Midnights Shirt Dress", required=False, max_length=100)
-
-    def __init__(self, game_id):
-        super().__init__()
-        self.game_id = game_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        a = active_games[self.game_id].setdefault("answers", {})
-        if self.skirt_1989.value:       a["1989_skirt"]       = self.skirt_1989.value
-        if self.ttpd_dress.value:       a["ttpd_dress"]       = self.ttpd_dress.value
-        if self.ttpd_set.value:         a["ttpd_set"]         = self.ttpd_set.value
-        if self.ttpd_jacket.value:      a["ttpd_jacket"]      = self.ttpd_jacket.value
-        if self.midnights_shirt.value:  a["midnights_shirt"]  = self.midnights_shirt.value
-        await interaction.response.send_message("Part 3 saved. Click below to continue.", view=AnswerNextView(self.game_id, 4), ephemeral=True)
-
-class AnswerModal4(Modal, title="Set Answers — Midnights / Surprise Songs"):
-    midnights_body = TextInput(label="Midnights Bodysuit", required=False, max_length=100)
-    karma_jacket   = TextInput(label="Karma Jacket", required=False, max_length=100)
-    surprise_dress = TextInput(label="Surprise Song Dress", required=False, max_length=100)
-    guitar_album   = TextInput(label="Guitar Surprise: Album", required=False, max_length=100)
-    guitar_song    = TextInput(label="Guitar Surprise: Song", required=False, max_length=100)
-
-    def __init__(self, game_id):
-        super().__init__()
-        self.game_id = game_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        a = active_games[self.game_id].setdefault("answers", {})
-        if self.midnights_body.value: a["midnights_body"] = self.midnights_body.value
-        if self.karma_jacket.value:   a["karma_jacket"]   = self.karma_jacket.value
-        if self.surprise_dress.value: a["surprise_dress"] = self.surprise_dress.value
-        if self.guitar_album.value:   a["guitar_album"]   = self.guitar_album.value
-        if self.guitar_song.value:    a["guitar_song"]    = self.guitar_song.value
-        await interaction.response.send_message("Part 4 saved. Click below to continue.", view=AnswerNextView(self.game_id, 5), ephemeral=True)
-
-class AnswerModal5(Modal, title="Set Answers — Piano / Other"):
-    piano_album     = TextInput(label="Piano Surprise: Album", required=False, max_length=100)
-    piano_song      = TextInput(label="Piano Surprise: Song", required=False, max_length=100)
-    special_guest   = TextInput(label="Special Guest", required=False, max_length=100)
-    setlist_change  = TextInput(label="Setlist Change", required=False, max_length=100)
-    notes           = TextInput(label="Any other notes", required=False, max_length=200)
-
-    def __init__(self, game_id):
-        super().__init__()
-        self.game_id = game_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        a = active_games[self.game_id].setdefault("answers", {})
-        if self.piano_album.value:    a["piano_album"]    = self.piano_album.value
-        if self.piano_song.value:     a["piano_song"]     = self.piano_song.value
-        if self.special_guest.value:  a["special_guest"]  = self.special_guest.value
-        if self.setlist_change.value: a["setlist_change"] = self.setlist_change.value
-
-        # Auto-close game and post results panel
-        active_games[self.game_id]["open"] = False
-        game = active_games[self.game_id]
-        show = game["show"]
-
-        lb_embed = build_leaderboard_embed(game)
-        lb_embed.set_footer(text="Click 'View Full Results' to see each player's breakdown.")
-
-        # Post to the channel the game is in, or reply here
-        view = ResultsPanelView(self.game_id)
-        await interaction.response.send_message(
-            content=f"Answers saved! Game closed. Leaderboard for **{show}**:",
-            embed=lb_embed,
-            view=view,
-            ephemeral=False
-        )
-
-ANSWER_MODALS = [None, AnswerModal1, AnswerModal2, AnswerModal3, AnswerModal4, AnswerModal5]
-
-class AnswerNextView(View):
-    def __init__(self, game_id, next_part):
         super().__init__(timeout=300)
         self.game_id = game_id
-        self.next_part = next_part
+        self.add_item(AnswerSelect("Lover Bodysuit", "lover_bodysuit", game_id, OUTFIT_OPTIONS["lover_bodysuit"]))
+        self.add_item(AnswerSelect("The Man Jacket", "lover_jacket", game_id, OUTFIT_OPTIONS["lover_jacket"]))
+        self.add_item(AnswerSelect("Lover Guitar", "lover_guitar", game_id, OUTFIT_OPTIONS["lover_guitar"]))
 
-    @discord.ui.button(label="Continue to Next Part", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Next: Fearless / Red / Speak Now", style=discord.ButtonStyle.primary, row=4)
     async def next_btn(self, interaction: discord.Interaction, button: Button):
-        modal_cls = ANSWER_MODALS[self.next_part]
-        await interaction.response.send_modal(modal_cls(self.game_id))
+        embed = discord.Embed(title="Set Answers — Fearless / Red / Speak Now", color=0xf1c40f,
+                              description="Select the correct answer for each category.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep2View(self.game_id))
 
+
+class AnswerStep2View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("Fearless Dress / Bodysuit", "fearless_dress", game_id, OUTFIT_OPTIONS["fearless_dress"]))
+        self.add_item(AnswerSelect("Red Shirt", "red_shirt", game_id, OUTFIT_OPTIONS["red_shirt"]))
+        self.add_item(AnswerSelect("Speak Now Dress", "speaknow_dress", game_id, OUTFIT_OPTIONS["speaknow_dress"]))
+
+    @discord.ui.button(label="Next: reputation / folklore", style=discord.ButtonStyle.primary, row=4)
+    async def next_btn(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(title="Set Answers — reputation / folklore", color=0x2c2f33,
+                              description="Select the correct answer for each category.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep3View(self.game_id))
+
+
+class AnswerStep3View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("rep Bodysuit", "rep_bodysuit", game_id, OUTFIT_OPTIONS["rep_bodysuit"]))
+        self.add_item(AnswerSelect("folklore Dress", "folklore_dress", game_id, OUTFIT_OPTIONS["folklore_dress"]))
+
+    @discord.ui.button(label="Next: 1989", style=discord.ButtonStyle.primary, row=4)
+    async def next_btn(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(title="Set Answers — 1989", color=0x3498db,
+                              description="Select the correct answer for each category.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep4View(self.game_id))
+
+
+class AnswerStep4View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("1989 Top", "1989_top", game_id, OUTFIT_OPTIONS["1989_top"]))
+        self.add_item(AnswerSelect("1989 Skirt", "1989_skirt", game_id, OUTFIT_OPTIONS["1989_skirt"]))
+
+    @discord.ui.button(label="Next: TTPD", style=discord.ButtonStyle.primary, row=4)
+    async def next_btn(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(title="Set Answers — TTPD", color=0x708090,
+                              description="Select the correct answer for each category.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep5View(self.game_id))
+
+
+class AnswerStep5View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("TTPD Dress", "ttpd_dress", game_id, OUTFIT_OPTIONS["ttpd_dress"]))
+        self.add_item(AnswerSelect("TTPD Set", "ttpd_set", game_id, OUTFIT_OPTIONS["ttpd_set"]))
+        self.add_item(AnswerSelect("TTPD Jacket / Cape", "ttpd_jacket", game_id, OUTFIT_OPTIONS["ttpd_jacket"]))
+
+    @discord.ui.button(label="Next: Midnights", style=discord.ButtonStyle.primary, row=4)
+    async def next_btn(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(title="Set Answers — Midnights", color=0x9b59b6,
+                              description="Select the correct answer for each category.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep6View(self.game_id))
+
+
+class AnswerStep6View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("Midnights Shirt Dress", "midnights_shirt", game_id, OUTFIT_OPTIONS["midnights_shirt"]))
+        self.add_item(AnswerSelect("Midnights Bodysuit", "midnights_body", game_id, OUTFIT_OPTIONS["midnights_body"]))
+        self.add_item(AnswerSelect("Karma Jacket", "karma_jacket", game_id, OUTFIT_OPTIONS["karma_jacket"]))
+
+    @discord.ui.button(label="Next: Surprise Songs & Other", style=discord.ButtonStyle.primary, row=4)
+    async def next_btn(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(title="Set Answers — Surprise Songs & Other", color=0xe67e22,
+                              description="Select the correct answers, then enter the guitar & piano songs via the button, then click Publish Results.")
+        await interaction.response.edit_message(embed=embed, view=AnswerStep7View(self.game_id))
+
+
+class AnswerSongsModal(Modal, title="Set Surprise Song Answers"):
+    guitar_album = TextInput(label="Guitar Surprise: Album", placeholder="e.g. folklore", required=False, max_length=50)
+    guitar_song  = TextInput(label="Guitar Surprise: Song", placeholder="e.g. Seven", required=False, max_length=100)
+    piano_album  = TextInput(label="Piano Surprise: Album", placeholder="e.g. Red (TV)", required=False, max_length=50)
+    piano_song   = TextInput(label="Piano Surprise: Song", placeholder="e.g. All Too Well (10 Min)", required=False, max_length=100)
+
+    def __init__(self, game_id):
+        super().__init__()
+        self.game_id = game_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        a = active_games[self.game_id]["answers"]
+        if self.guitar_album.value: a["guitar_album"] = self.guitar_album.value
+        if self.guitar_song.value:  a["guitar_song"]  = self.guitar_song.value
+        if self.piano_album.value:  a["piano_album"]  = self.piano_album.value
+        if self.piano_song.value:   a["piano_song"]   = self.piano_song.value
+        await interaction.response.send_message("Surprise songs saved! Click Publish Results when ready.", ephemeral=True)
+
+
+class AnswerStep7View(View):
+    def __init__(self, game_id):
+        super().__init__(timeout=300)
+        self.game_id = game_id
+        self.add_item(AnswerSelect("Surprise Song Dress", "surprise_dress", game_id, OUTFIT_OPTIONS["surprise_dress"]))
+        self.add_item(AnswerSelect("Special Guest", "special_guest", game_id, OUTFIT_OPTIONS["special_guest"]))
+        self.add_item(AnswerSelect("Setlist Change", "setlist_change", game_id, OUTFIT_OPTIONS["setlist_change"]))
+
+    @discord.ui.button(label="Enter Guitar & Piano Songs", style=discord.ButtonStyle.secondary, row=4)
+    async def songs_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(AnswerSongsModal(self.game_id))
+
+    @discord.ui.button(label="Publish Results", style=discord.ButtonStyle.success, row=4)
+    async def publish_btn(self, interaction: discord.Interaction, button: Button):
+        game = active_games[self.game_id]
+        game["open"] = False
+        lb_embed = build_leaderboard_embed(game)
+        lb_embed.set_footer(text="Use the buttons below to view full results and submissions.")
+        await interaction.response.edit_message(
+            content=f"Answers saved. Results for **{game['show']}**:",
+            embed=lb_embed,
+            view=ResultsPanelView(self.game_id)
+        )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RESULTS PANEL VIEW
+#  RESULTS PANEL
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class ResultsPanelView(View):
@@ -539,12 +520,10 @@ class ResultsPanelView(View):
         answers = game.get("answers", {})
         if not answers:
             await interaction.response.send_message("No answers have been set yet.", ephemeral=True); return
-
         embeds = []
         for uid, entry in list(game["entries"].items())[:10]:
             e, pts, possible = build_score_embed(entry, answers, game["show"])
             embeds.append(e)
-
         if not embeds:
             await interaction.response.send_message("No entries to show.", ephemeral=True); return
         await interaction.response.send_message(embeds=embeds, ephemeral=True)
@@ -554,8 +533,7 @@ class ResultsPanelView(View):
         game = active_games.get(self.game_id)
         if not game:
             await interaction.response.send_message("Game not found.", ephemeral=True); return
-        embed = build_leaderboard_embed(game)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=build_leaderboard_embed(game), ephemeral=True)
 
     @discord.ui.button(label="View All Submissions", style=discord.ButtonStyle.secondary)
     async def all_submissions(self, interaction: discord.Interaction, button: Button):
@@ -567,35 +545,7 @@ class ResultsPanelView(View):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ADMIN — CREATE GAME
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class CreateGameModal(Modal, title="Create Mastermind Game"):
-    show_name   = TextInput(label="Show Name / Date", placeholder="e.g. Sydney Night 1 — Feb 23, 2024", max_length=100)
-    description = TextInput(label="Description", placeholder="Place your bets before the show!", style=discord.TextStyle.paragraph, required=False)
-    thumbnail   = TextInput(label="Thumbnail Image URL (optional)", placeholder="https://example.com/eras.png", required=False)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        game_id = f"{interaction.guild_id}_{int(datetime.now(timezone.utc).timestamp())}"
-        active_games[game_id] = {"show": self.show_name.value, "open": True, "entries": {}, "answers": {}}
-        desc = self.description.value or "Think you know what Taylor will wear and play? Place your bets before the show starts!"
-        embed = discord.Embed(title=f"Eras Tour Mastermind — {self.show_name.value}", description=desc, color=0xff6b9d)
-        embed.add_field(name="Lover", value="Bodysuit / The Man Jacket / Guitar", inline=True)
-        embed.add_field(name="Fearless / Red / Speak Now", value="Fearless Dress / Red Shirt / Speak Now Dress", inline=True)
-        embed.add_field(name="rep / folklore", value="rep Bodysuit / folklore Dress", inline=False)
-        embed.add_field(name="1989", value="Combo OR Top + Skirt", inline=True)
-        embed.add_field(name="TTPD", value="Dress / Set / Jacket/Cape", inline=True)
-        embed.add_field(name="Midnights", value="Shirt Dress / Bodysuit / Karma Jacket", inline=False)
-        embed.add_field(name="Surprise Songs", value="Dress / Guitar (Album + Song) / Piano (Album + Song)", inline=False)
-        embed.add_field(name="Other", value="Special Guest / Setlist Change", inline=False)
-        embed.set_footer(text="Click Play Mastermind to place your bets.")
-        if self.thumbnail.value:
-            embed.set_thumbnail(url=self.thumbnail.value)
-        await interaction.response.send_message(embed=embed, view=MastermindGameView(game_id))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  ADMIN — GAME PICKER SELECTS
+#  ADMIN GAME PICKER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class GamePickerSelect(Select):
@@ -619,12 +569,43 @@ class GamePickerSelect(Select):
             embeds = [build_summary_embed(e, game["show"]) for e in list(game["entries"].values())[:10]]
             await interaction.response.send_message(embeds=embeds, ephemeral=True)
         elif self.action == "answers":
-            await interaction.response.send_modal(AnswerModal1(gid))
+            active_games[gid].setdefault("answers", {})
+            embed = discord.Embed(title=f"Set Answers — {game['show']} — Lover Era", color=0xff6b9d,
+                                  description="Select the correct outfit for each category, then click Next.")
+            await interaction.response.send_message(embed=embed, view=AnswerStep1LoverView(gid), ephemeral=True)
 
 class GamePickerView(View):
     def __init__(self, games, action):
         super().__init__(timeout=60)
         self.add_item(GamePickerSelect(games, action))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ADMIN — CREATE GAME
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CreateGameModal(Modal, title="Create Mastermind Game"):
+    show_name   = TextInput(label="Show Name / Date", placeholder="e.g. Sydney Night 1 — Feb 23, 2024", max_length=100)
+    description = TextInput(label="Description", placeholder="Place your bets before the show!", style=discord.TextStyle.paragraph, required=False)
+    thumbnail   = TextInput(label="Thumbnail Image URL (optional)", placeholder="https://example.com/eras.png", required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        game_id = f"{interaction.guild_id}_{int(datetime.now(timezone.utc).timestamp())}"
+        active_games[game_id] = {"show": self.show_name.value, "open": True, "entries": {}, "answers": {}}
+        desc = self.description.value or "Think you know what Taylor will wear and play? Place your bets before the show starts!"
+        embed = discord.Embed(title=f"Eras Tour Mastermind — {self.show_name.value}", description=desc, color=0xff6b9d)
+        embed.add_field(name="Lover", value="Bodysuit / The Man Jacket / Guitar", inline=True)
+        embed.add_field(name="Fearless / Red / Speak Now", value="Fearless Dress / Red Shirt / Speak Now Dress", inline=True)
+        embed.add_field(name="rep / folklore", value="rep Bodysuit / folklore Dress", inline=False)
+        embed.add_field(name="1989", value="Top / Skirt", inline=True)
+        embed.add_field(name="TTPD", value="Dress / Set / Jacket/Cape", inline=True)
+        embed.add_field(name="Midnights", value="Shirt Dress / Bodysuit / Karma Jacket", inline=False)
+        embed.add_field(name="Surprise Songs", value="Dress / Guitar (Album + Song) / Piano (Album + Song)", inline=False)
+        embed.add_field(name="Other", value="Special Guest / Setlist Change", inline=False)
+        embed.set_footer(text="Click Play Mastermind to place your bets.")
+        if self.thumbnail.value:
+            embed.set_thumbnail(url=self.thumbnail.value)
+        await interaction.response.send_message(embed=embed, view=MastermindGameView(game_id))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -697,19 +678,27 @@ intents = discord.Intents.default()
 client  = discord.Client(intents=intents)
 tree    = app_commands.CommandTree(client)
 
+# ── /bulletin ──────────────────────────────────────────────────────────────────
 @tree.command(name="bulletin", description="Create and post a bulletin embed")
 @app_commands.choices(action=[app_commands.Choice(name="create", value="create")])
 async def bulletin(interaction: discord.Interaction, action: app_commands.Choice[str]):
+    if not is_admin(interaction):
+        await deny(interaction); return
     await interaction.response.send_message("Bulletin Builder — pick a color:", view=ColorPickerView(), ephemeral=True)
 
+# ── /mastermind ────────────────────────────────────────────────────────────────
 mastermind_group = app_commands.Group(name="mastermind", description="Eras Tour Mastermind guessing game")
 
 @mastermind_group.command(name="create", description="[Admin] Create a new Mastermind game for a show")
 async def mastermind_create(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction); return
     await interaction.response.send_modal(CreateGameModal())
 
 @mastermind_group.command(name="close", description="[Admin] Close submissions for a game")
 async def mastermind_close(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction); return
     games = [(gid, g) for gid, g in active_games.items() if g.get("open")]
     if not games:
         await interaction.response.send_message("No open games.", ephemeral=True); return
@@ -717,12 +706,16 @@ async def mastermind_close(interaction: discord.Interaction):
 
 @mastermind_group.command(name="entries", description="[Admin] View all entries for a game")
 async def mastermind_entries(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction); return
     if not active_games:
         await interaction.response.send_message("No games found.", ephemeral=True); return
     await interaction.response.send_message("Select a game:", view=GamePickerView(list(active_games.items()), "entries"), ephemeral=True)
 
-@mastermind_group.command(name="list", description="List all active games and entry counts")
+@mastermind_group.command(name="list", description="[Admin] List all active games and entry counts")
 async def mastermind_list(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction); return
     if not active_games:
         await interaction.response.send_message("No active games.", ephemeral=True); return
     lines = [f"**{g['show']}** — {'Open' if g['open'] else 'Closed'} — {len(g['entries'])} entries"
@@ -733,6 +726,8 @@ answer_group = app_commands.Group(name="answer", description="Set answers and sc
 
 @answer_group.command(name="create", description="[Admin] Set the real answers for a show and publish results")
 async def answer_create(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction); return
     if not active_games:
         await interaction.response.send_message("No games found.", ephemeral=True); return
     await interaction.response.send_message("Select a game to set answers for:", view=GamePickerView(list(active_games.items()), "answers"), ephemeral=True)
