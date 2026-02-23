@@ -105,7 +105,7 @@ def build_summary_embed(entry, show):
     e.add_field(name="rep / folklore",
                 value=f"rep Bodysuit: {entry.get('rep_bodysuit','—')}\nfolklore Dress: {entry.get('folklore_dress','—')}", inline=False)
     e.add_field(name="1989",
-                value=f"Combo: entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
+                value=f"Combo: {entry.get('1989_top','—')}\nSkirt: {entry.get('1989_skirt','—')}", inline=False)
     e.add_field(name="TTPD",
                 value=f"Dress: {entry.get('ttpd_dress','—')}\nSet: {entry.get('ttpd_set','—')}\nJacket/Cape: {entry.get('ttpd_jacket','—')}", inline=False)
     e.add_field(name="Midnights",
