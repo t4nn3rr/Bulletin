@@ -33,6 +33,26 @@ YTDL_OPTIONS = {
     "cookiefile": None,
 }
 
+import shutil
+import subprocess
+
+def find_ffmpeg():
+    # Try common locations
+    for path in ["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/nix/var/nix/profiles/default/bin/ffmpeg"]:
+        if shutil.which(path):
+            return shutil.which(path)
+    # Try nix store
+    try:
+        result = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "ffmpeg"
+
+FFMPEG_PATH = find_ffmpeg()
+print(f"FFmpeg path: {FFMPEG_PATH}")
+
 FFMPEG_OPTIONS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-vn",
@@ -116,7 +136,7 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
             play_next(guild, voice_client), client.loop
         )
 
-    source = discord.FFmpegPCMAudio(track["url"], **FFMPEG_OPTIONS)
+    source = discord.FFmpegPCMAudio(track["url"], executable=FFMPEG_PATH, **FFMPEG_OPTIONS)
     source = discord.PCMVolumeTransformer(source, volume=0.5)
     voice_client.play(source, after=after_play)
 
