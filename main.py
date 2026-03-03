@@ -10,12 +10,168 @@ from collections import deque
 from datetime import datetime, timezone
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-WEBHOOK_URL  = "https://discord.com/api/webhooks/1475369638001901761/juynubLrFgKHt9cG5E4tGCfj5DZdO5JDPdhu8pREGVEBEVxFCRZxYvwqisLTiyqfWxoa"
-BOT_TOKEN    = os.getenv("DISCORD_BOT_TOKEN")
-ADMIN_ROLE   = 1475027064817188906
+WEBHOOK_URL      = "https://discord.com/api/webhooks/1475369638001901761/juynubLrFgKHt9cG5E4tGCfj5DZdO5JDPdhu8pREGVEBEVxFCRZxYvwqisLTiyqfWxoa"
+BOT_TOKEN        = os.getenv("DISCORD_BOT_TOKEN")
+ADMIN_ROLE       = 1475027064817188906
+ROLES_CHANNEL_ID = 1475286488643145758
 # ──────────────────────────────────────────────────────────────────────────────
 
 active_games: dict = {}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ROLE TRACKING SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+DANCER_ROLES = [
+    "Amanda Balen",
+    "Tori Evans",
+    "Raphael Thomas",
+    "Audrey Douglass",
+    "Kevin Scheitzbach",
+    "Jan Ravnik",
+    "Kameron Saunders",
+    "Taylor Banks",
+    "Natalie Peterson",
+    "Sydney Moss",
+    "Tamiya Lewis",
+    "Natalie Reid",
+    "Sam Mcwilliams",
+    "Whyley Yoshimura",
+    "Karen Chuang",
+]
+
+# role_assignments: { dancer_name: discord_user_mention_str or None }
+role_assignments: dict = {name: None for name in DANCER_ROLES}
+
+# Stores the message ID of the posted roles embed so we can edit it
+roles_embed_message_id: int | None = None
+
+def build_roles_embed() -> discord.Embed:
+    e = discord.Embed(title="Roles", color=0xff6b9d)
+    lines = []
+    for dancer in DANCER_ROLES:
+        assigned = role_assignments.get(dancer)
+        if assigned:
+            lines.append(f"* {dancer} — {assigned}")
+        else:
+            lines.append(f"* {dancer}")
+    e.description = "\n".join(lines)
+    e.set_footer(text=f"Last updated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    return e
+
+async def post_or_update_roles_embed(channel: discord.TextChannel):
+    global roles_embed_message_id
+    embed = build_roles_embed()
+
+    if roles_embed_message_id:
+        try:
+            msg = await channel.fetch_message(roles_embed_message_id)
+            await msg.edit(embed=embed)
+            return
+        except (discord.NotFound, discord.HTTPException):
+            roles_embed_message_id = None
+
+    # Post a new message
+    msg = await channel.send(embed=embed)
+    roles_embed_message_id = msg.id
+
+# ── /role group ────────────────────────────────────────────────────────────────
+role_group = app_commands.Group(name="role", description="Manage tour dancer role assignments")
+
+@role_group.command(name="assign", description="[Admin] Assign a dancer role to a user")
+@app_commands.describe(
+    dancer="The dancer's name",
+    user="The Discord user playing this role"
+)
+async def role_assign(interaction: discord.Interaction, dancer: str, user: discord.Member):
+    if not is_admin(interaction):
+        await deny(interaction)
+        return
+
+    # Case-insensitive match
+    matched = next((d for d in DANCER_ROLES if d.lower() == dancer.lower()), None)
+    if not matched:
+        close = [d for d in DANCER_ROLES if dancer.lower() in d.lower()]
+        suggestion = f"\nDid you mean: {', '.join(close)}?" if close else ""
+        await interaction.response.send_message(
+            f"Dancer `{dancer}` not found.{suggestion}\n\nAvailable roles:\n" + "\n".join(f"• {d}" for d in DANCER_ROLES),
+            ephemeral=True
+        )
+        return
+
+    role_assignments[matched] = user.mention
+    channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
+    if channel:
+        await post_or_update_roles_embed(channel)
+        await interaction.response.send_message(
+            f"✅ Assigned **{matched}** to {user.mention} and updated the roles embed.", ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            f"✅ Assigned **{matched}** to {user.mention}, but couldn't find the roles channel.", ephemeral=True
+        )
+
+@role_assign.autocomplete("dancer")
+async def dancer_autocomplete(interaction: discord.Interaction, current: str):
+    return [
+        app_commands.Choice(name=d, value=d)
+        for d in DANCER_ROLES
+        if current.lower() in d.lower()
+    ][:25]
+
+@role_group.command(name="remove", description="[Admin] Remove a user from a dancer role")
+@app_commands.describe(dancer="The dancer's name to unassign")
+async def role_remove(interaction: discord.Interaction, dancer: str):
+    if not is_admin(interaction):
+        await deny(interaction)
+        return
+
+    matched = next((d for d in DANCER_ROLES if d.lower() == dancer.lower()), None)
+    if not matched:
+        close = [d for d in DANCER_ROLES if dancer.lower() in d.lower()]
+        suggestion = f"\nDid you mean: {', '.join(close)}?" if close else ""
+        await interaction.response.send_message(
+            f"Dancer `{dancer}` not found.{suggestion}", ephemeral=True
+        )
+        return
+
+    if not role_assignments[matched]:
+        await interaction.response.send_message(
+            f"**{matched}** has no one assigned to them.", ephemeral=True
+        )
+        return
+
+    role_assignments[matched] = None
+    channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
+    if channel:
+        await post_or_update_roles_embed(channel)
+        await interaction.response.send_message(
+            f"✅ Removed assignment from **{matched}** and updated the roles embed.", ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            f"✅ Removed assignment from **{matched}**, but couldn't find the roles channel.", ephemeral=True
+        )
+
+@role_remove.autocomplete("dancer")
+async def dancer_remove_autocomplete(interaction: discord.Interaction, current: str):
+    return [
+        app_commands.Choice(name=d, value=d)
+        for d in DANCER_ROLES
+        if current.lower() in d.lower()
+    ][:25]
+
+@role_group.command(name="panel", description="[Admin] Post or refresh the roles embed in the roles channel")
+async def role_panel(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        await deny(interaction)
+        return
+    channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
+    if not channel:
+        await interaction.response.send_message("Could not find the roles channel.", ephemeral=True)
+        return
+    await post_or_update_roles_embed(channel)
+    await interaction.response.send_message("✅ Roles embed posted/updated.", ephemeral=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  MUSIC SYSTEM
@@ -37,11 +193,9 @@ import shutil
 import subprocess
 
 def find_ffmpeg():
-    # Try common locations
     for path in ["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/nix/var/nix/profiles/default/bin/ffmpeg"]:
         if shutil.which(path):
             return shutil.which(path)
-    # Try nix store
     try:
         result = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True)
         if result.returncode == 0:
@@ -108,7 +262,6 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
     if not queue:
         now_playing[guild.id] = None
         await update_bot_status(None)
-        # Update channel name back
         if voice_client and voice_client.channel:
             try:
                 await voice_client.channel.edit(name="music")
@@ -121,7 +274,6 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
 
     await update_bot_status(track)
 
-    # Update voice channel name to show current song (truncated to 100 chars)
     if voice_client and voice_client.channel:
         try:
             short = track["title"][:90]
@@ -892,6 +1044,9 @@ async def answer_create(interaction: discord.Interaction):
 
 mastermind_group.add_command(answer_group)
 tree.add_command(mastermind_group)
+
+# ── /role ──────────────────────────────────────────────────────────────────────
+tree.add_command(role_group)
 
 # ── /music ─────────────────────────────────────────────────────────────────────
 music_group = app_commands.Group(name="music", description="Music player")
