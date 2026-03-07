@@ -214,23 +214,11 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
     if not queue:
         now_playing[guild.id] = None
         await update_bot_status(None)
-        if voice_client and voice_client.channel:
-            try:
-                await voice_client.channel.edit(name="music")
-            except Exception:
-                pass
         return
 
     track = queue.popleft()
     now_playing[guild.id] = track
     await update_bot_status(track)
-
-    if voice_client and voice_client.channel:
-        try:
-            short = track["title"][:90]
-            await voice_client.channel.edit(name=f"♪ {short}")
-        except Exception:
-            pass
 
     def after_play(error):
         if error:
@@ -1289,6 +1277,26 @@ async def screenshare(interaction: discord.Interaction, video: str):
         embed=embed,
         view=WatchPartyView(guild.id)
     )
+
+
+@client.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    """Auto-disconnect when the bot is alone in the voice channel."""
+    vc = member.guild.voice_client
+    if not vc:
+        return
+    # Only care about events in the channel the bot is in
+    if before.channel != vc.channel and after.channel != vc.channel:
+        return
+    # Count non-bot members still in the channel
+    human_members = [m for m in vc.channel.members if not m.bot]
+    if len(human_members) == 0:
+        get_queue(member.guild.id).clear()
+        now_playing[member.guild.id] = None
+        active_watch_parties.pop(member.guild.id, None)
+        vc.stop()
+        await vc.disconnect()
+        await update_bot_status(None)
 
 @client.event
 async def on_ready():
