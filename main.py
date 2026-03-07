@@ -40,10 +40,7 @@ DANCER_ROLES = [
     "Karen Chuang",
 ]
 
-# role_assignments: { dancer_name: discord_user_mention_str or None }
 role_assignments: dict = {name: None for name in DANCER_ROLES}
-
-# Stores the message ID of the posted roles embed so we can edit it
 roles_embed_message_id: int | None = None
 
 def build_roles_embed() -> discord.Embed:
@@ -62,7 +59,6 @@ def build_roles_embed() -> discord.Embed:
 async def post_or_update_roles_embed(channel: discord.TextChannel):
     global roles_embed_message_id
     embed = build_roles_embed()
-
     if roles_embed_message_id:
         try:
             msg = await channel.fetch_message(roles_embed_message_id)
@@ -70,106 +66,66 @@ async def post_or_update_roles_embed(channel: discord.TextChannel):
             return
         except (discord.NotFound, discord.HTTPException):
             roles_embed_message_id = None
-
-    # Post a new message
     msg = await channel.send(embed=embed)
     roles_embed_message_id = msg.id
 
-# ── /role group ────────────────────────────────────────────────────────────────
 role_group = app_commands.Group(name="role", description="Manage tour dancer role assignments")
 
 @role_group.command(name="assign", description="[Admin] Assign a dancer role to a user")
-@app_commands.describe(
-    dancer="The dancer's name",
-    user="The Discord user playing this role"
-)
+@app_commands.describe(dancer="The dancer's name", user="The Discord user playing this role")
 async def role_assign(interaction: discord.Interaction, dancer: str, user: discord.Member):
     if not is_admin(interaction):
-        await deny(interaction)
-        return
-
-    # Case-insensitive match
+        await deny(interaction); return
     matched = next((d for d in DANCER_ROLES if d.lower() == dancer.lower()), None)
     if not matched:
         close = [d for d in DANCER_ROLES if dancer.lower() in d.lower()]
         suggestion = f"\nDid you mean: {', '.join(close)}?" if close else ""
         await interaction.response.send_message(
             f"Dancer `{dancer}` not found.{suggestion}\n\nAvailable roles:\n" + "\n".join(f"• {d}" for d in DANCER_ROLES),
-            ephemeral=True
-        )
-        return
-
+            ephemeral=True); return
     role_assignments[matched] = user.mention
     channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
     if channel:
         await post_or_update_roles_embed(channel)
-        await interaction.response.send_message(
-            f"✅ Assigned **{matched}** to {user.mention} and updated the roles embed.", ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Assigned **{matched}** to {user.mention} and updated the roles embed.", ephemeral=True)
     else:
-        await interaction.response.send_message(
-            f"✅ Assigned **{matched}** to {user.mention}, but couldn't find the roles channel.", ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Assigned **{matched}** to {user.mention}, but couldn't find the roles channel.", ephemeral=True)
 
 @role_assign.autocomplete("dancer")
 async def dancer_autocomplete(interaction: discord.Interaction, current: str):
-    return [
-        app_commands.Choice(name=d, value=d)
-        for d in DANCER_ROLES
-        if current.lower() in d.lower()
-    ][:25]
+    return [app_commands.Choice(name=d, value=d) for d in DANCER_ROLES if current.lower() in d.lower()][:25]
 
 @role_group.command(name="remove", description="[Admin] Remove a user from a dancer role")
 @app_commands.describe(dancer="The dancer's name to unassign")
 async def role_remove(interaction: discord.Interaction, dancer: str):
     if not is_admin(interaction):
-        await deny(interaction)
-        return
-
+        await deny(interaction); return
     matched = next((d for d in DANCER_ROLES if d.lower() == dancer.lower()), None)
     if not matched:
         close = [d for d in DANCER_ROLES if dancer.lower() in d.lower()]
         suggestion = f"\nDid you mean: {', '.join(close)}?" if close else ""
-        await interaction.response.send_message(
-            f"Dancer `{dancer}` not found.{suggestion}", ephemeral=True
-        )
-        return
-
+        await interaction.response.send_message(f"Dancer `{dancer}` not found.{suggestion}", ephemeral=True); return
     if not role_assignments[matched]:
-        await interaction.response.send_message(
-            f"**{matched}** has no one assigned to them.", ephemeral=True
-        )
-        return
-
+        await interaction.response.send_message(f"**{matched}** has no one assigned to them.", ephemeral=True); return
     role_assignments[matched] = None
     channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
     if channel:
         await post_or_update_roles_embed(channel)
-        await interaction.response.send_message(
-            f"✅ Removed assignment from **{matched}** and updated the roles embed.", ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Removed assignment from **{matched}** and updated the roles embed.", ephemeral=True)
     else:
-        await interaction.response.send_message(
-            f"✅ Removed assignment from **{matched}**, but couldn't find the roles channel.", ephemeral=True
-        )
+        await interaction.response.send_message(f"✅ Removed assignment from **{matched}**, but couldn't find the roles channel.", ephemeral=True)
 
 @role_remove.autocomplete("dancer")
 async def dancer_remove_autocomplete(interaction: discord.Interaction, current: str):
-    return [
-        app_commands.Choice(name=d, value=d)
-        for d in DANCER_ROLES
-        if current.lower() in d.lower()
-    ][:25]
+    return [app_commands.Choice(name=d, value=d) for d in DANCER_ROLES if current.lower() in d.lower()][:25]
 
 @role_group.command(name="panel", description="[Admin] Post or refresh the roles embed in the roles channel")
 async def role_panel(interaction: discord.Interaction):
     if not is_admin(interaction):
-        await deny(interaction)
-        return
+        await deny(interaction); return
     channel = interaction.guild.get_channel(ROLES_CHANNEL_ID)
     if not channel:
-        await interaction.response.send_message("Could not find the roles channel.", ephemeral=True)
-        return
+        await interaction.response.send_message("Could not find the roles channel.", ephemeral=True); return
     await post_or_update_roles_embed(channel)
     await interaction.response.send_message("✅ Roles embed posted/updated.", ephemeral=True)
 
@@ -177,8 +133,8 @@ async def role_panel(interaction: discord.Interaction):
 #  MUSIC SYSTEM
 # ═══════════════════════════════════════════════════════════════════════════════
 
-music_queues: dict = {}   # guild_id -> deque of track dicts
-now_playing:  dict = {}   # guild_id -> current track dict
+music_queues: dict = {}
+now_playing:  dict = {}
 
 YTDL_OPTIONS = {
     "format": "bestaudio/best",
@@ -218,7 +174,6 @@ def get_queue(guild_id: int) -> deque:
     return music_queues[guild_id]
 
 async def fetch_track(query: str) -> dict | None:
-    """Search or resolve a URL and return track info dict."""
     loop = asyncio.get_event_loop()
     def _extract():
         with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
@@ -249,10 +204,7 @@ def fmt_duration(seconds: int) -> str:
 async def update_bot_status(track: dict | None):
     if track:
         await client.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.listening,
-                name=track["title"]
-            )
+            activity=discord.Activity(type=discord.ActivityType.listening, name=track["title"])
         )
     else:
         await client.change_presence(activity=discord.Game(name="Nothing playing"))
@@ -271,7 +223,6 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
 
     track = queue.popleft()
     now_playing[guild.id] = track
-
     await update_bot_status(track)
 
     if voice_client and voice_client.channel:
@@ -284,9 +235,7 @@ async def play_next(guild: discord.Guild, voice_client: discord.VoiceClient):
     def after_play(error):
         if error:
             print(f"Playback error: {error}")
-        asyncio.run_coroutine_threadsafe(
-            play_next(guild, voice_client), client.loop
-        )
+        asyncio.run_coroutine_threadsafe(play_next(guild, voice_client), client.loop)
 
     source = discord.FFmpegPCMAudio(track["url"], executable=FFMPEG_PATH, **FFMPEG_OPTIONS)
     source = discord.PCMVolumeTransformer(source, volume=0.5)
@@ -397,7 +346,126 @@ class MusicPanelView(View):
         await interaction.response.send_message(embed=e, ephemeral=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  EXISTING BOT CODE (unchanged below)
+#  WATCH PARTY SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Tracks active watch parties per guild: guild_id -> watch party info dict
+active_watch_parties: dict = {}
+
+def build_watch_party_embed(track: dict, host: str, started_at: datetime) -> discord.Embed:
+    e = discord.Embed(
+        title="🎬 Watch Party",
+        description=f"**[{track['title']}]({track['webpage']})**",
+        color=0x7289da
+    )
+    e.add_field(name="Duration", value=fmt_duration(track["duration"]), inline=True)
+    e.add_field(name="Hosted by", value=host, inline=True)
+    e.add_field(name="Started at", value=started_at.strftime("%H:%M UTC"), inline=True)
+    e.add_field(
+        name="How to sync",
+        value=(
+            f"1. Open the video link above\n"
+            f"2. Seek to match the timestamp shown on the **Sync** button\n"
+            f"3. Hit play at the same time as everyone else!\n"
+            f"4. The bot is playing the audio — mute the video tab to avoid echo."
+        ),
+        inline=False
+    )
+    if track["thumbnail"]:
+        e.set_image(url=track["thumbnail"])
+    e.set_footer(text="Use the buttons below to sync, pause, or end the watch party.")
+    return e
+
+def get_elapsed(guild_id: int) -> int:
+    """Return elapsed seconds since the watch party started (pausing not tracked)."""
+    party = active_watch_parties.get(guild_id)
+    if not party:
+        return 0
+    delta = datetime.now(timezone.utc) - party["started_at"]
+    return int(delta.total_seconds())
+
+def fmt_timestamp(seconds: int) -> str:
+    m, s = divmod(max(0, seconds), 60)
+    h, m = divmod(m, 60)
+    return f"{h}:{m:02}:{s:02}" if h else f"{m}:{s:02}"
+
+class WatchPartyView(View):
+    def __init__(self, guild_id: int):
+        super().__init__(timeout=None)
+        self.guild_id = guild_id
+
+    def _get_vc(self) -> discord.VoiceClient | None:
+        guild = client.get_guild(self.guild_id)
+        return guild.voice_client if guild else None
+
+    @discord.ui.button(label="⏱ Sync Timestamp", style=discord.ButtonStyle.primary, row=0)
+    async def sync_btn(self, interaction: discord.Interaction, button: Button):
+        elapsed = get_elapsed(self.guild_id)
+        ts = fmt_timestamp(elapsed)
+        party = active_watch_parties.get(self.guild_id)
+        title = party["track"]["title"] if party else "the video"
+        link = party["track"]["webpage"] if party else ""
+        await interaction.response.send_message(
+            f"⏱ **Sync Point — seek to `{ts}`**\n"
+            f"Open **[{title}]({link})**, seek to `{ts}`, then hit play!\n"
+            f"*(Mute the video tab — the bot is playing the audio.)*",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="⏸ Pause Audio", style=discord.ButtonStyle.secondary, row=0)
+    async def pause_btn(self, interaction: discord.Interaction, button: Button):
+        vc = self._get_vc()
+        if vc and vc.is_playing():
+            vc.pause()
+            await interaction.response.send_message("⏸ Audio paused. Everyone pause your video too!", ephemeral=False)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="▶ Resume Audio", style=discord.ButtonStyle.success, row=0)
+    async def resume_btn(self, interaction: discord.Interaction, button: Button):
+        vc = self._get_vc()
+        if vc and vc.is_paused():
+            vc.resume()
+            await interaction.response.send_message("▶ Audio resumed. Everyone hit play!", ephemeral=False)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="🔗 Video Link", style=discord.ButtonStyle.secondary, row=0)
+    async def link_btn(self, interaction: discord.Interaction, button: Button):
+        party = active_watch_parties.get(self.guild_id)
+        if not party:
+            await interaction.response.send_message("No active watch party.", ephemeral=True); return
+        elapsed = get_elapsed(self.guild_id)
+        ts = fmt_timestamp(elapsed)
+        await interaction.response.send_message(
+            f"🔗 **{party['track']['title']}**\n{party['track']['webpage']}\nCurrent timestamp: `{ts}`",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="⏹ End Watch Party", style=discord.ButtonStyle.danger, row=1)
+    async def end_btn(self, interaction: discord.Interaction, button: Button):
+        vc = self._get_vc()
+        get_queue(self.guild_id).clear()
+        now_playing[self.guild_id] = None
+        active_watch_parties.pop(self.guild_id, None)
+        if vc:
+            vc.stop()
+            await vc.disconnect()
+        await update_bot_status(None)
+        e = discord.Embed(title="Watch Party Ended", color=0x2c2f33,
+                          description="The watch party has been ended. Thanks for watching!")
+        await interaction.response.edit_message(embed=e, view=None)
+
+    @discord.ui.button(label="🔄 Refresh Embed", style=discord.ButtonStyle.secondary, row=1)
+    async def refresh_btn(self, interaction: discord.Interaction, button: Button):
+        party = active_watch_parties.get(self.guild_id)
+        if not party:
+            await interaction.response.defer(); return
+        embed = build_watch_party_embed(party["track"], party["host"], party["started_at"])
+        await interaction.response.edit_message(embed=embed, view=self)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  EXISTING BOT CODE
 # ═══════════════════════════════════════════════════════════════════════════════
 
 COLORS = {
@@ -1056,24 +1124,18 @@ music_group = app_commands.Group(name="music", description="Music player")
 async def music_play(interaction: discord.Interaction, query: str):
     if not interaction.user.voice or not interaction.user.voice.channel:
         await interaction.response.send_message("You need to be in a voice channel.", ephemeral=True); return
-
     await interaction.response.defer()
-
     track = await fetch_track(query)
     if not track:
         await interaction.followup.send("Could not find that track. Try a different search or URL."); return
-
     track["requester"] = str(interaction.user)
     guild = interaction.guild
     vc = guild.voice_client
-
     if not vc:
         vc = await interaction.user.voice.channel.connect()
     elif vc.channel != interaction.user.voice.channel:
         await vc.move_to(interaction.user.voice.channel)
-
     queue = get_queue(guild.id)
-
     if vc.is_playing() or vc.is_paused():
         queue.append(track)
         e = discord.Embed(title="Added to Queue", description=f"**{track['title']}**", color=0x1db954)
@@ -1164,6 +1226,69 @@ async def music_resume(interaction: discord.Interaction):
         await interaction.response.send_message("Not paused.", ephemeral=True)
 
 tree.add_command(music_group)
+
+# ── /screenshare ───────────────────────────────────────────────────────────────
+@tree.command(name="screenshare", description="Start a watch party — plays audio and posts a sync embed")
+@app_commands.describe(video="YouTube URL or search keywords for the video to watch together")
+async def screenshare(interaction: discord.Interaction, video: str):
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.response.send_message(
+            "You need to be in a voice channel to start a watch party.", ephemeral=True
+        ); return
+
+    await interaction.response.defer()
+
+    # Fetch track info
+    track = await fetch_track(video)
+    if not track:
+        await interaction.followup.send(
+            "Couldn't find that video. Try a direct YouTube URL or different search terms."
+        ); return
+
+    track["requester"] = str(interaction.user)
+
+    guild = interaction.guild
+    vc = guild.voice_client
+
+    # Connect or move to the user's voice channel
+    if not vc:
+        vc = await interaction.user.voice.channel.connect()
+    elif vc.channel != interaction.user.voice.channel:
+        # Stop any existing playback before moving
+        if vc.is_playing() or vc.is_paused():
+            vc.stop()
+        await vc.move_to(interaction.user.voice.channel)
+
+    # Stop any current music/watch party and clear state
+    get_queue(guild.id).clear()
+    now_playing[guild.id] = None
+    if vc.is_playing() or vc.is_paused():
+        vc.stop()
+        await asyncio.sleep(0.5)  # brief pause to let the stop propagate
+
+    # Register the watch party
+    started_at = datetime.now(timezone.utc)
+    active_watch_parties[guild.id] = {
+        "track":      track,
+        "host":       str(interaction.user),
+        "started_at": started_at,
+    }
+
+    # Queue and play the audio
+    queue = get_queue(guild.id)
+    queue.appendleft(track)
+    await play_next(guild, vc)
+    await update_bot_status(track)
+
+    # Build and send the watch party embed
+    embed = build_watch_party_embed(track, str(interaction.user), started_at)
+    await interaction.followup.send(
+        content=f"🎬 **Watch Party started by {interaction.user.mention}!**\n"
+                f"Join **{interaction.user.voice.channel.name}** and open the video link below.\n"
+                f"Mute the video tab — the bot is playing the audio in VC.",
+        embed=embed,
+        view=WatchPartyView(guild.id)
+    )
 
 @client.event
 async def on_ready():
