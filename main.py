@@ -1305,3 +1305,312 @@ async def on_ready():
     print(f"Logged in as {client.user} — slash commands synced.")
 
 client.run(BOT_TOKEN)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  FAMILY SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+# Data structure (all keyed by guild_id -> user_id):
+#   family_data[guild_id][user_id] = {
+#       "spouse": user_id | None,
+#       "parents": [user_id, ...],   # max 2
+#       "children": [user_id, ...],
+#   }
+# Pending proposals: proposals[guild_id][(proposer_id, target_id)] = "marry"|"adopt"
+
+family_data: dict = {}   # guild_id -> { user_id -> profile }
+proposals:   dict = {}   # guild_id -> { (from_id, to_id) -> "marry"|"adopt" }
+
+def get_family(guild_id: int) -> dict:
+    if guild_id not in family_data:
+        family_data[guild_id] = {}
+    return family_data[guild_id]
+
+def get_profile(guild_id: int, user_id: int) -> dict:
+    db = get_family(guild_id)
+    if user_id not in db:
+        db[user_id] = {"spouse": None, "parents": [], "children": []}
+    return db[user_id]
+
+def get_pending(guild_id: int) -> dict:
+    if guild_id not in proposals:
+        proposals[guild_id] = {}
+    return proposals[guild_id]
+
+# ─── Proposal View (accept / decline) ─────────────────────────────────────────
+
+class ProposalView(View):
+    def __init__(self, guild_id: int, proposer_id: int, target_id: int, kind: str):
+        super().__init__(timeout=120)
+        self.guild_id    = guild_id
+        self.proposer_id = proposer_id
+        self.target_id   = target_id
+        self.kind        = kind  # "marry" or "adopt"
+
+    async def _check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.target_id:
+            await interaction.response.send_message("This proposal isn't for you.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
+    async def accept(self, interaction: discord.Interaction, button: Button):
+        if not await self._check(interaction):
+            return
+        self.stop()
+        db = get_family(self.guild_id)
+        p  = get_profile(self.guild_id, self.proposer_id)
+        t  = get_profile(self.guild_id, self.target_id)
+
+        # Remove pending
+        get_pending(self.guild_id).pop((self.proposer_id, self.target_id), None)
+
+        proposer = interaction.guild.get_member(self.proposer_id)
+        target   = interaction.user
+
+        if self.kind == "marry":
+            # Double-check still single
+            if p["spouse"] or t["spouse"]:
+                await interaction.response.edit_message(
+                    content="❌ One of you is already married. The proposal has been cancelled.", view=None)
+                return
+            p["spouse"] = self.target_id
+            t["spouse"] = self.proposer_id
+            e = discord.Embed(
+                title="💍 Just Married!",
+                description=f"**{proposer.mention}** and **{target.mention}** are now married! 🎉",
+                color=0xff6b9d
+            )
+            await interaction.response.edit_message(content=None, embed=e, view=None)
+
+        elif self.kind == "adopt":
+            # Check target doesn't already have 2 parents
+            if len(t["parents"]) >= 2:
+                await interaction.response.edit_message(
+                    content="❌ You already have two parents and can't be adopted.", view=None)
+                return
+            if self.proposer_id not in p["children"]:
+                p["children"].append(self.target_id)
+            if self.proposer_id not in t["parents"]:
+                t["parents"].append(self.proposer_id)
+            # Also add spouse of proposer as parent if they have one
+            if p["spouse"] and p["spouse"] != self.target_id:
+                sp = get_profile(self.guild_id, p["spouse"])
+                if self.target_id not in sp["children"]:
+                    sp["children"].append(self.target_id)
+                if p["spouse"] not in t["parents"]:
+                    t["parents"].append(p["spouse"])
+            e = discord.Embed(
+                title="👨‍👩‍👧 Adoption Complete!",
+                description=f"**{target.mention}** has been adopted by **{proposer.mention}**! 🎉",
+                color=0x2ecc71
+            )
+            await interaction.response.edit_message(content=None, embed=e, view=None)
+
+    @discord.ui.button(label="❌ Decline", style=discord.ButtonStyle.danger)
+    async def decline(self, interaction: discord.Interaction, button: Button):
+        if not await self._check(interaction):
+            return
+        self.stop()
+        get_pending(self.guild_id).pop((self.proposer_id, self.target_id), None)
+        kind_str = "marriage proposal" if self.kind == "marry" else "adoption request"
+        await interaction.response.edit_message(
+            content=f"💔 **{interaction.user.mention}** declined the {kind_str}.", view=None)
+
+    async def on_timeout(self):
+        get_pending(self.guild_id).pop((self.proposer_id, self.target_id), None)
+
+# ─── /marry ────────────────────────────────────────────────────────────────────
+
+@tree.command(name="marry", description="Propose marriage to another user")
+@app_commands.describe(user="The user you want to propose to")
+async def marry(interaction: discord.Interaction, user: discord.Member):
+    if user.bot:
+        await interaction.response.send_message("You can't marry a bot!", ephemeral=True); return
+    if user.id == interaction.user.id:
+        await interaction.response.send_message("You can't marry yourself!", ephemeral=True); return
+
+    gid = interaction.guild_id
+    p   = get_profile(gid, interaction.user.id)
+    t   = get_profile(gid, user.id)
+
+    if p["spouse"]:
+        await interaction.response.send_message("You're already married! Use `/divorce` first.", ephemeral=True); return
+    if t["spouse"]:
+        await interaction.response.send_message(f"{user.mention} is already married.", ephemeral=True); return
+
+    # Check not parent/child of each other
+    if interaction.user.id in t["children"] or interaction.user.id in t["parents"] \
+    or user.id in p["children"] or user.id in p["parents"]:
+        await interaction.response.send_message("You can't marry a family member!", ephemeral=True); return
+
+    key = (interaction.user.id, user.id)
+    if key in get_pending(gid):
+        await interaction.response.send_message("You already have a pending proposal to that person.", ephemeral=True); return
+
+    get_pending(gid)[key] = "marry"
+    e = discord.Embed(
+        title="💍 Marriage Proposal!",
+        description=f"**{interaction.user.mention}** has proposed to **{user.mention}**!\n\nDo you accept?",
+        color=0xff6b9d
+    )
+    await interaction.response.send_message(
+        content=user.mention,
+        embed=e,
+        view=ProposalView(gid, interaction.user.id, user.id, "marry")
+    )
+
+# ─── /divorce ──────────────────────────────────────────────────────────────────
+
+@tree.command(name="divorce", description="Divorce your current spouse")
+async def divorce(interaction: discord.Interaction):
+    gid = interaction.guild_id
+    p   = get_profile(gid, interaction.user.id)
+
+    if not p["spouse"]:
+        await interaction.response.send_message("You're not married.", ephemeral=True); return
+
+    spouse_id = p["spouse"]
+    sp        = get_profile(gid, spouse_id)
+    spouse    = interaction.guild.get_member(spouse_id)
+
+    p["spouse"]  = None
+    sp["spouse"] = None
+
+    spouse_str = spouse.mention if spouse else f"<@{spouse_id}>"
+    e = discord.Embed(
+        title="💔 Divorced",
+        description=f"**{interaction.user.mention}** and **{spouse_str}** are now divorced.",
+        color=0xe74c3c
+    )
+    await interaction.response.send_message(embed=e)
+
+# ─── /adopt ────────────────────────────────────────────────────────────────────
+
+@tree.command(name="adopt", description="Send an adoption request to another user")
+@app_commands.describe(user="The user you want to adopt")
+async def adopt(interaction: discord.Interaction, user: discord.Member):
+    if user.bot:
+        await interaction.response.send_message("You can't adopt a bot!", ephemeral=True); return
+    if user.id == interaction.user.id:
+        await interaction.response.send_message("You can't adopt yourself!", ephemeral=True); return
+
+    gid = interaction.guild_id
+    p   = get_profile(gid, interaction.user.id)
+    t   = get_profile(gid, user.id)
+
+    # Can't adopt a parent or spouse
+    if user.id in p["parents"] or user.id == p["spouse"]:
+        await interaction.response.send_message("You can't adopt a parent or your spouse!", ephemeral=True); return
+    if interaction.user.id in t["children"]:
+        await interaction.response.send_message(f"{user.mention} is already your child.", ephemeral=True); return
+    if len(t["parents"]) >= 2:
+        await interaction.response.send_message(f"{user.mention} already has two parents.", ephemeral=True); return
+
+    key = (interaction.user.id, user.id)
+    if key in get_pending(gid):
+        await interaction.response.send_message("You already have a pending request to that person.", ephemeral=True); return
+
+    get_pending(gid)[key] = "adopt"
+    e = discord.Embed(
+        title="👨‍👩‍👧 Adoption Request!",
+        description=f"**{interaction.user.mention}** wants to adopt **{user.mention}**!\n\nDo you accept?",
+        color=0x2ecc71
+    )
+    await interaction.response.send_message(
+        content=user.mention,
+        embed=e,
+        view=ProposalView(gid, interaction.user.id, user.id, "adopt")
+    )
+
+# ─── /disown ───────────────────────────────────────────────────────────────────
+
+@tree.command(name="disown", description="Remove a child from your family")
+@app_commands.describe(user="The child you want to disown")
+async def disown(interaction: discord.Interaction, user: discord.Member):
+    gid = interaction.guild_id
+    p   = get_profile(gid, interaction.user.id)
+
+    if user.id not in p["children"]:
+        await interaction.response.send_message(f"{user.mention} is not your child.", ephemeral=True); return
+
+    p["children"].remove(user.id)
+    child = get_profile(gid, user.id)
+    if interaction.user.id in child["parents"]:
+        child["parents"].remove(interaction.user.id)
+
+    # Also remove from spouse's children list
+    if p["spouse"]:
+        sp = get_profile(gid, p["spouse"])
+        if user.id in sp["children"]:
+            sp["children"].remove(user.id)
+        if p["spouse"] in child["parents"]:
+            child["parents"].remove(p["spouse"])
+
+    e = discord.Embed(
+        title="👤 Disowned",
+        description=f"**{user.mention}** has been removed from **{interaction.user.mention}**'s family.",
+        color=0x95a5a6
+    )
+    await interaction.response.send_message(embed=e)
+
+# ─── /familytree ───────────────────────────────────────────────────────────────
+
+@tree.command(name="familytree", description="View your family tree (or another user's)")
+@app_commands.describe(user="The user whose family tree to view (defaults to yourself)")
+async def familytree(interaction: discord.Interaction, user: discord.Member = None):
+    await interaction.response.defer()
+    target = user or interaction.user
+    gid    = interaction.guild_id
+    prof   = get_profile(gid, target.id)
+
+    def name(uid: int) -> str:
+        m = interaction.guild.get_member(uid)
+        return m.display_name if m else f"Unknown ({uid})"
+
+    e = discord.Embed(
+        title=f"👨‍👩‍👧‍👦 {target.display_name}'s Family Tree",
+        color=0xff6b9d
+    )
+
+    # Parents
+    if prof["parents"]:
+        parent_names = " & ".join(f"**{name(pid)}**" for pid in prof["parents"])
+        e.add_field(name="👨‍👩‍👦 Parents", value=parent_names, inline=False)
+    else:
+        e.add_field(name="👨‍👩‍👦 Parents", value="*None*", inline=False)
+
+    # Spouse
+    if prof["spouse"]:
+        sp    = get_profile(gid, prof["spouse"])
+        heart = "💍"
+        e.add_field(name=f"{heart} Spouse", value=f"**{name(prof['spouse'])}**", inline=False)
+    else:
+        e.add_field(name="💍 Spouse", value="*None*", inline=False)
+
+    # Siblings (share at least one parent)
+    siblings = set()
+    for pid in prof["parents"]:
+        parent_prof = get_profile(gid, pid)
+        for sib in parent_prof["children"]:
+            if sib != target.id:
+                siblings.add(sib)
+    if siblings:
+        sib_names = ", ".join(f"**{name(sid)}**" for sid in siblings)
+        e.add_field(name="👫 Siblings", value=sib_names, inline=False)
+
+    # Children
+    if prof["children"]:
+        child_lines = []
+        for cid in prof["children"]:
+            cp = get_profile(gid, cid)
+            # show grandchildren count
+            gc = len(cp["children"])
+            gc_str = f" *(+{gc} child{'ren' if gc != 1 else ''})*" if gc else ""
+            child_lines.append(f"**{name(cid)}**{gc_str}")
+        e.add_field(name=f"👶 Children ({len(prof['children'])})", value="\n".join(child_lines), inline=False)
+    else:
+        e.add_field(name="👶 Children", value="*None*", inline=False)
+
+    e.set_thumbnail(url=target.display_avatar.url)
+    e.set_footer(text=f"Use /marry, /adopt, /divorce, /disown to manage your family.")
+    await interaction.followup.send(embed=e)
